@@ -31,13 +31,11 @@
       border-right: 2px solid rgb(60, 60, 60);
       min-width: 100px;
       min-height: 102px;
-      color: white;
       align-content: center;
       justify-content: center;
       display: flex;
       flex-wrap: wrap;
       font-size: 50px;
-      background-color: rgb(40, 40, 40);
     }
     .tier_body {
       min-width: 102px;
@@ -67,13 +65,19 @@
     <button type="button" onclick="save_as_image()">
       download
     </button>
+    <button type="button" onclick="save_tierlist()">
+      save
+    </button>
+    <button type="button" onclick="load_tierlist()">
+      load
+    </button>
   </div>
   <script>
     var main_table = document.getElementById("main_table");
     const start_elements_count = 6;
     const start_elements_strings = ["S", "A", "B", "C", "D", "F"];
-    var db;
-    
+    //var db;
+
     function download_file(data, filename) {
       let a = document.createElement("a");
       a.href = data;
@@ -83,6 +87,72 @@
       setTimeout(function() {
         document.body.removeChild(a);
       }, 0);
+    }
+    
+    function download_text_file(data, filename) {
+      const blob = new Blob([data], {type: 'text/csv'});
+      let a = document.createElement("a");
+      a.href = window.URL.createObjectURL(blob);
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function() {
+        document.body.removeChild(a);
+      }, 0);
+    }
+  
+    function load_text(onchange_func) {
+      const file_selector = document.createElement('input');
+      file_selector.setAttribute('type', 'file');
+      file_selector.setAttribute('accept','text');
+      file_selector.onchange = onchange_func;
+      file_selector.click();
+    }
+
+    function save_tierlist() {
+      var saved = ""
+
+      let tiers = document.getElementsByTagName("tr")
+
+      for (let i = 0; i < tiers.length; i++) {
+        let tier_head = tiers[i].firstChild;
+        let tier_body = tiers[i].lastChild;
+        saved += tier_head.innerHTML;
+        saved += "|";
+        saved += window.getComputedStyle(tier_head).getPropertyValue("background-color");
+        saved += "|";
+        saved += window.getComputedStyle(tier_head).getPropertyValue("color");
+        for (let j = 0; j < tier_body.children.length; j++) {
+          saved += "|";
+          saved += tier_body.children[j].src;
+        }
+        saved += "||"
+      }
+
+      download_text_file(saved, "tierlist.txt");
+    }
+
+    function load_tierlist() {
+      load_text(function(e){
+        const file = e.target.files[0];
+        const reader = new FileReader();
+        reader.addEventListener('load', (event) => {
+          let elements = document.getElementsByTagName("tr");
+          for (;elements.length;) {
+            elements[0].remove();
+          }
+          let savefile = reader.result;
+          let tier_saves = savefile.split("||");
+          for (let i = 0; i < tier_saves.length-1; i++) {
+            let tier_data_saves = tier_saves[i].split("|");
+            let new_tier = add_new_tier(tier_data_saves[0], tier_data_saves[1], tier_data_saves[2]);
+            for (let j = 3; j < tier_data_saves.length; j++) {
+              add_image(new_tier.lastChild, tier_data_saves[j]);
+            }
+          }
+        });
+        reader.readAsText(file);
+      });
     }
     
     function save_as_image() {
@@ -143,32 +213,37 @@
       file_selector.onchange = onchange_func;
       file_selector.click();
     }
-  
+    
+    function add_image(element_to, data) {
+      let new_image = new Image();
+      new_image.src = data;
+      new_image.draggable=true;
+      new_image.style.height = 100+"px";
+      new_image.style.padding = "1px 1px 1px 1px"
+      new_image.ondragstart = dragstartHandler;
+      element_to.appendChild(new_image);
+    }
+
     function add_new_image(element_to) {
       load_texture(function(e) {
         const files = e.target.files;
         for (const file of files){
           const reader = new FileReader();
           reader.addEventListener('load', (event) => {
-            let new_image = new Image();
-            new_image.src = reader.result;
-            new_image.draggable=true;
-            new_image.style.height = 100+"px";
-            new_image.style.padding = "1px 1px 1px 1px"
-            new_image.ondragstart = dragstartHandler;
-            element_to.appendChild(new_image);
+            add_image(element_to, reader.result);
           });
           reader.readAsDataURL(file);
         }
       })
     }
   
-    function add_new_tier(tier_text, tier_color) {
+    function add_new_tier(tier_text, tier_color, tier_text_color) {
       let new_tier = document.createElement("tr");
   
       let new_tier_head = document.createElement("div");
   
       new_tier_head.style.backgroundColor = tier_color;
+      new_tier_head.style.color = tier_text_color;
       new_tier_head.classList.add("tier_head");
       new_tier_head.innerHTML = tier_text;
       new_tier_head.onclick = function() {
@@ -241,22 +316,23 @@
       new_tier.appendChild(new_addbutton);
       new_tier.appendChild(new_tier_body);
       main_table.appendChild(new_tier);
+      return new_tier;
     }
   
     (function main() {
-      const request = indexedDB.open("Sergwest_simple_tier_list");
+      /*const request = indexedDB.open("Sergwest_simple_tier_list");
       request.onerror = (event) => {
         console.error("Why didn't you allow my web app to use IndexedDB?!");
       };
       request.onsuccess = (event) => {
         db = event.target.result;
       };
-      /*db.onerror = (event) => {
+      db.onerror = (event) => {
         console.error(`Database error: ${event.target.errorCode}`);
       };*/
 
       for (let iter = 0; iter < start_elements_count; iter++) {
-        add_new_tier(start_elements_strings[iter], "hsl(" + (360 * iter / start_elements_count) + ",60%,50%)");
+        add_new_tier(start_elements_strings[iter], "hsl(" + (360 * iter / start_elements_count) + ",60%,50%)", "rgb(255,255,255)");
       }
       let trash_element = document.getElementById("trash");
       trash_element.ondragover = dragoverHandler;
